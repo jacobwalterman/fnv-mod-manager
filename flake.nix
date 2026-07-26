@@ -9,7 +9,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       devShells.${system}.default = pkgs.mkShell {
-        packages = [ pkgs.python312 pkgs.ruff ];
+        packages = [ pkgs.python312 pkgs.python312Packages.pytest pkgs.ruff ];
       };
     };
 }

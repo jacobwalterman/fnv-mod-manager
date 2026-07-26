@@ -25,7 +25,7 @@ def create_symlink_with_parent_directories(file_source_path, symlink_destination
 
 
 # this is programmed as first wins instead of last wins
-def merge_paths(root_dirs, target_root_directory):
+def merge_mods(root_dirs, target_root_directory):
     unique_relative_paths = set()
     for root_dir in root_dirs:
         path_group = (collect_file_and_empty_dir_paths(root_dir))
@@ -40,4 +40,4 @@ def merge_paths(root_dirs, target_root_directory):
 if __name__ == "__main__":
     TARGET_ROOT_DIR = pathlib.Path()
     MODLIST = []
-    merge_paths(MODLIST, TARGET_ROOT_DIR)
+    merge_mods(MODLIST, TARGET_ROOT_DIR)
