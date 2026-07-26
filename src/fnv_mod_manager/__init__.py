@@ -1,6 +1,19 @@
 """Symlink-tree merge tool for FNV mod management."""
 
 import pathlib
+import os
+import time
+
+####### ESP TIMER MODIFICATION
+# this is done as FNV loads plugins based on last modified time
+def set_utimes_in_order(ordered_plugin_paths):
+    base = time.time()
+    set_utimes_in_order_with_set_base(base, ordered_plugin_paths)
+
+def set_utimes_in_order_with_set_base(base, ordered_plugin_paths):
+    for index, plugin_path in enumerate(ordered_plugin_paths):
+        mtime = base + index * 60
+        os.utime(plugin_path, times=(mtime, mtime))
 
 __version__ = "0.1.0"
 def collect_unique_elements(bucket, unique_elements):
@@ -23,7 +36,7 @@ def create_symlink_with_parent_directories(file_source_path, symlink_destination
     symlink_destination.parent.mkdir(parents=True)
     symlink_destination.symlink_to(file_source_path)
 
-
+####### LOOSE FILE MOD MERGING DYNAMICS
 # this is programmed as first wins instead of last wins
 def merge_mods(root_dirs, target_root_directory):
     unique_relative_paths = set()
