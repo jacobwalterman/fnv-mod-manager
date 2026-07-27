@@ -1,8 +1,21 @@
 """Symlink-tree merge tool for FNV mod management."""
 
+__version__ = "0.1.0"
+
 import pathlib
 import os
 import time
+import os
+from pathlib import Path
+
+PACKAGE_NAME = "fnv-mod-manager"
+####### DATA FOLDER CODE
+def data_dir() -> Path:
+    base = os.environ.get("XDG_DATA_HOME")
+    return Path(base) if base else Path.home() / ".local" / "share"
+
+def get_mod_manager_data_folder():
+    return data_dir() / PACKAGE_NAME
 
 ####### ESP TIMER MODIFICATION
 # this is done as FNV loads plugins based on last modified time
@@ -15,13 +28,13 @@ def set_utimes_in_order_with_set_base(base, ordered_plugin_paths):
         mtime = base + index * 60
         os.utime(plugin_path, times=(mtime, mtime))
 
-__version__ = "0.1.0"
 def collect_unique_elements(bucket, unique_elements):
     new_unique_elements = set()
     for element in bucket:
         if element not in unique_elements and element not in new_unique_elements:
             new_unique_elements.add(element)
     return new_unique_elements
+
 # paths are from root to file/empty-dir
 def collect_file_and_empty_dir_paths(root_dir: pathlib.Path):
     paths = []
