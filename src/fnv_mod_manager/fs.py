@@ -4,9 +4,10 @@ import subprocess
 
 PACKAGE_NAME = "fnv-mod-manager"
 
+# TODO: BUGFIX: will overwrite and potentially merge two mods with the same name
 def extract_archive(archive_path, dest_dir):
     subprocess.run(
-        ["7z", "x", str(archive_path), f"-o{dest_dir}", "-y"],
+        ["7z", "x", str(archive_path), f"-o{dest_dir / archive_path.stem}", "-y"],
         check=True,
     )
 

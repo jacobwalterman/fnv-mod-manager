@@ -2,17 +2,20 @@ import argparse
 import subprocess
 import sys
 
+
 from fnv_mod_manager import fs
+from pathlib import Path
 
 CLI_NAME = 'fnvmm'
 
 def install(args):
+    filepath = Path(args.filepath)
     try:
-        fs.extract_archive_to_mods_folder(args.filename)
+        fs.extract_archive_to_mods_folder(filepath)
     except subprocess.CalledProcessError:
-        print(f"Error: failed to extract {args.filename}", file=sys.stderr)
+        print(f"Error: failed to extract {filepath}", file=sys.stderr)
         sys.exit(1)
-    print(f"Installed {args.filename}")
+    print(f"Installed {filepath}")
 
 def build_parser():
     parser = argparse.ArgumentParser(
@@ -32,7 +35,7 @@ def build_parser():
         help='install a file into your mods folder for management',
     )
     parser_install.add_argument(
-        'filename', type=str,
+        'filepath', type=str,
         help='the path of the file you want to install into your mods folder.',
     )
     parser_install.set_defaults(func=install)
