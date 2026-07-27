@@ -9,3 +9,14 @@ def data_dir() -> Path:
 
 def get_mod_manager_data_folder():
     return data_dir() / PACKAGE_NAME
+
+####### DEFAULT FOLDER STRUCTURE
+root_folder = Path("Fallout New Vegas")
+crash_logs = root_folder.joinpath(Path("Crash Logs"))
+fallout = root_folder.joinpath(Path("FalloutNV.exe"))
+fallout_launcher = root_folder.joinpath(Path("FalloutNVLauncher.exe"))
+data = root_folder.joinpath(Path("Data"))
+music = data.joinpath(Path("Music"))
+shaders = data.joinpath(Path("Shaders"))
+sound = data.joinpath(Path("Sound"))
+video = data.joinpath(Path("Video"))
