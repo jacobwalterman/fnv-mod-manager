@@ -6,13 +6,15 @@ PACKAGE_NAME = "fnv-mod-manager"
 
 # TODO: BUGFIX: will overwrite and potentially merge two mods with the same name
 def extract_archive(archive_path, dest_dir):
+    destination = dest_dir / archive_path.stem
     subprocess.run(
-        ["7z", "x", str(archive_path), f"-o{dest_dir / archive_path.stem}", "-y"],
+        ["7z", "x", str(archive_path), f"-o{destination}", "-y"],
         check=True,
     )
+    return destination
 
 def extract_archive_to_mods_folder(archive_path):
-    extract_archive(archive_path, get_mod_manager_mods_folder())
+    return extract_archive(archive_path, get_mod_manager_mods_folder())
 
 def data_dir() -> Path:
     base = os.environ.get("XDG_DATA_HOME")
@@ -24,7 +26,13 @@ def get_mod_manager_data_folder():
 def get_mod_manager_mods_folder():
     return get_mod_manager_data_folder() / "mods"
 
-####### DEFAULT FOLDER STRUCTURE
+def get_mod_manager_loose_files_folder():
+    return  get_mod_manager_data_folder() / "loose_files"
+
+def get_mod_manager_esps_folder():
+    return get_mod_manager_data_folder() / "esps"
+
+####### DEFAULT FOLDER STRUCTURE OF FNV
 root_folder = Path("Fallout New Vegas")
 crash_logs = root_folder.joinpath(Path("Crash Logs"))
 fallout = root_folder.joinpath(Path("FalloutNV.exe"))

@@ -18,7 +18,7 @@ def collect_file_and_empty_dir_paths(root_dir: Path):
     return paths
 
 def create_symlink_with_parent_directories(file_source_path, symlink_destination):
-    symlink_destination.parent.mkdir(parents=True)
+    symlink_destination.parent.mkdir(parents=True, exist_ok=True)
     symlink_destination.symlink_to(file_source_path)
 
 # this is programmed as first wins instead of last wins
