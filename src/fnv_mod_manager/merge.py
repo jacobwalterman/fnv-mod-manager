@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from fnv_mod_manager.fs import get_mod_manager_data_folder
 def collect_unique_elements(bucket, unique_elements):
     new_unique_elements = set()
     for element in bucket:
@@ -17,19 +17,28 @@ def collect_file_and_empty_dir_paths(root_dir: Path):
             paths.append(Path.joinpath(dirpath, name))
     return paths
 
-def create_symlink_with_parent_directories(file_source_path, symlink_destination):
-    symlink_destination.parent.mkdir(parents=True, exist_ok=True)
-    symlink_destination.symlink_to(file_source_path)
+# symlinks all directory files and dirs onto symlink_tree_root as if symlink_tree_root replaced directory_root
+def reroot_directory_tree_into_symlink_tree(directory_root: Path, symlink_tree_root: Path):
+    print(f"Ill symlink {directory_root}'s contents into {symlink_tree_root}")
+    directory_tree_paths = collect_file_and_empty_dir_paths(directory_root)
+    for path in directory_tree_paths:
+        rerooted_path = create_rerooted_path(path, directory_root, symlink_tree_root)
+        create_symlink_make_parent_dirs_no_overwrite(path, rerooted_path)
 
-# this is programmed as first wins instead of last wins
-def merge_mods(root_dirs, target_root_directory):
-    unique_relative_paths = set()
+def create_rerooted_path(path: Path, root_directory: Path, target_root_directory: Path) -> Path:
+    return target_root_directory / path.relative_to(root_directory)
+
+def create_symlink_make_parent_dirs_no_overwrite(symlink_source, symlink_destination):
+            if not symlink_destination.parent.exists():
+                symlink_destination.parent.mkdir(parents=True, exist_ok=True)
+            if not symlink_destination.exists():
+                symlink_destination.symlink_to(symlink_source)
+
+# writes paths first wins
+def merge_mods_first_wins(root_dirs):
+    mods_destination_directory = get_mod_manager_data_folder() / "Fallout New Vegas" / "Data"
     for root_dir in root_dirs:
-        path_group = (collect_file_and_empty_dir_paths(root_dir))
-        orphaned_path_group = [path.relative_to(root_dir) for path in path_group]
-        new_unique_relative_paths = collect_unique_elements(orphaned_path_group, unique_relative_paths)
-        unique_relative_paths |= new_unique_relative_paths
-        for relative_path in new_unique_relative_paths:
-            unique_absolute_path = root_dir.joinpath(relative_path)
-            symlink_destination = target_root_directory.joinpath(relative_path)
-            create_symlink_with_parent_directories(unique_absolute_path, symlink_destination)
+        reroot_directory_tree_into_symlink_tree(root_dir, mods_destination_directory)
+    game_files_root = get_mod_manager_data_folder() / "game-files" / "Fallout New Vegas"
+    symlink_game_files_root = get_mod_manager_data_folder() / "Fallout New Vegas"
+    reroot_directory_tree_into_symlink_tree(game_files_root, symlink_game_files_root)
