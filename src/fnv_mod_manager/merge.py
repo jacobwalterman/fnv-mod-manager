@@ -1,11 +1,5 @@
 from pathlib import Path
-from fnv_mod_manager.fs import get_mod_manager_data_folder
-def collect_unique_elements(bucket, unique_elements):
-    new_unique_elements = set()
-    for element in bucket:
-        if element not in unique_elements and element not in new_unique_elements:
-            new_unique_elements.add(element)
-    return new_unique_elements
+import fnv_mod_manager.fs as fs
 
 # paths are from root to file/empty-dir
 def collect_file_and_empty_dir_paths(root_dir: Path):
@@ -19,7 +13,6 @@ def collect_file_and_empty_dir_paths(root_dir: Path):
 
 # symlinks all directory files and dirs onto symlink_tree_root as if symlink_tree_root replaced directory_root
 def reroot_directory_tree_into_symlink_tree(directory_root: Path, symlink_tree_root: Path):
-    print(f"Ill symlink {directory_root}'s contents into {symlink_tree_root}")
     directory_tree_paths = collect_file_and_empty_dir_paths(directory_root)
     for path in directory_tree_paths:
         rerooted_path = create_rerooted_path(path, directory_root, symlink_tree_root)
@@ -36,9 +29,6 @@ def create_symlink_make_parent_dirs_no_overwrite(symlink_source, symlink_destina
 
 # writes paths first wins
 def merge_mods_first_wins(root_dirs):
-    mods_destination_directory = get_mod_manager_data_folder() / "Fallout New Vegas" / "Data"
     for root_dir in root_dirs:
-        reroot_directory_tree_into_symlink_tree(root_dir, mods_destination_directory)
-    game_files_root = get_mod_manager_data_folder() / "game-files" / "Fallout New Vegas"
-    symlink_game_files_root = get_mod_manager_data_folder() / "Fallout New Vegas"
-    reroot_directory_tree_into_symlink_tree(game_files_root, symlink_game_files_root)
+        reroot_directory_tree_into_symlink_tree(root_dir, fs.SYMLINKED_DATA_PATH)
+    reroot_directory_tree_into_symlink_tree(fs.GAME_FILES_PATH, fs.SYMLINKED_GAME_PATH)

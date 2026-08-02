@@ -2,8 +2,10 @@ import argparse
 import subprocess
 import sys
 
+import fnv_mod_manager.fs as fs
+
 from fnv_mod_manager.esps import set_utimes_in_order
-from fnv_mod_manager.fs import extract_archive_to_mods_folder, get_mod_manager_mods_folder, get_mod_manager_esps_folder, get_mod_manager_loose_files_folder, get_mod_manager_data_folder
+from fnv_mod_manager.fs import extract_archive 
 from fnv_mod_manager.merge import  merge_mods_first_wins
 from fnv_mod_manager.config import get_load_orders
 
@@ -17,13 +19,12 @@ def create_symlink_with_parent_directories(file_source_path, symlink_destination
     if not symlink_destination.exists():
         symlink_destination.symlink_to(file_source_path)
 
-
 # TODO: BUGFIX: the loose_files esps creation should have the same issue of potential accidental merges with mods/ base folders with the same name
 def install(args):
     filepaths = args.filepaths
     for filepath in filepaths:
         try:
-            destination = extract_archive_to_mods_folder(filepath)
+            destination = extract_archive(filepath, fs.MODS_PATH)
         except subprocess.CalledProcessError:
             print(f"Error: failed to extract {filepath}", file=sys.stderr)
             sys.exit(1)
@@ -32,7 +33,7 @@ def install(args):
         loose_files, esps = walk_and_sort_paths(destination)
         for file_path_group, staging_root, file_type in zip(
             [loose_files, esps],
-            [get_mod_manager_loose_files_folder(), get_mod_manager_esps_folder()],
+            [fs.LOOSE_FILES_PATH, fs.ESPS_PATH],
             ["loose files", "esps"],
         ):
             for file_path in file_path_group:
@@ -64,10 +65,8 @@ def symlink_load_order(args):
     merge_mods_first_wins(loose_files[::-1])
     # TODO: confirm this is in the correct order
     set_utimes_in_order(esps)
-    MERGE_MODS_DESTINATION = get_mod_manager_data_folder() / "Fallout New Vegas" / "Data"
     for esp in esps:
-        create_symlink_with_parent_directories(esp, MERGE_MODS_DESTINATION)
-
+        create_symlink_with_parent_directories(esp, fs.SYMLINKED_DATA_PATH)
 
 def build_parser():
     parser = argparse.ArgumentParser(
