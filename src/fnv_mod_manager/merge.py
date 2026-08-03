@@ -31,4 +31,4 @@ def create_symlink_make_parent_dirs_no_overwrite(symlink_source, symlink_destina
 def merge_mods_first_wins(root_dirs):
     for root_dir in root_dirs:
         reroot_directory_tree_into_symlink_tree(root_dir, fs.SYMLINKED_DATA_PATH)
-    reroot_directory_tree_into_symlink_tree(fs.GAME_FILES_PATH, fs.SYMLINKED_GAME_PATH)
+    reroot_directory_tree_into_symlink_tree(fs.FALLOUT_NEW_VEGAS_PATH, fs.SYMLINKED_GAME_PATH)

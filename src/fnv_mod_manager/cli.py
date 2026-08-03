@@ -6,18 +6,13 @@ import fnv_mod_manager.fs as fs
 
 from fnv_mod_manager.esps import set_utimes_in_order
 from fnv_mod_manager.fs import extract_archive 
-from fnv_mod_manager.merge import  merge_mods_first_wins
+from fnv_mod_manager.merge import  merge_mods_first_wins, create_symlink_make_parent_dirs_no_overwrite
 from fnv_mod_manager.config import get_load_orders
 
 from pathlib import Path
 
 CLI_NAME = 'fnvmm'
 
-def create_symlink_with_parent_directories(file_source_path, symlink_destination):
-    if not symlink_destination.parent.exists():
-        symlink_destination.parent.mkdir(parents=True, exist_ok=True)
-    if not symlink_destination.exists():
-        symlink_destination.symlink_to(file_source_path)
 
 # TODO: BUGFIX: the loose_files esps creation should have the same issue of potential accidental merges with mods/ base folders with the same name
 def install(args):
@@ -39,7 +34,7 @@ def install(args):
             for file_path in file_path_group:
                 relative_path = file_path.relative_to(destination)
                 symlink_destination = staging_root / mod_name / relative_path
-                create_symlink_with_parent_directories(file_path, symlink_destination)
+                create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
             print(f"Staged {file_type} under {staging_root / mod_name}")    
 
 # returns a list of Path objects sorting all files and empty dirs as loose_files or esps
@@ -66,7 +61,7 @@ def symlink_load_order(args):
     # TODO: confirm this is in the correct order
     set_utimes_in_order(esps)
     for esp in esps:
-        create_symlink_with_parent_directories(esp, fs.SYMLINKED_DATA_PATH)
+        create_symlink_make_parent_dirs_no_overwrite(esp, fs.SYMLINKED_DATA_PATH)
 
 def build_parser():
     parser = argparse.ArgumentParser(
