@@ -9,7 +9,7 @@ ESP_FILES_KEY = "esps"
 LOAD_ORDER_KEY = "load-order"
 
 @cache
-def _load_toml(configuration_file):
+def _load_toml(configuration_file) -> dict:
     with open(configuration_file, "rb") as f:
         return tomllib.load(f)
 
@@ -34,18 +34,19 @@ def make_default_sugared_names_configuration_file(configuration_file: Path):
         f.write(f'[{LOOSE_FILES_KEY}]\n[{ESP_FILES_KEY}]\n')
 
 def access_load_order_from_configuration(configuration_file, file_type_key: str) -> list[str]:
-    return _load_toml(configuration_file)[file_type_key]
+    return _load_toml(configuration_file)[file_type_key][LOAD_ORDER_KEY]
 
-def get_desugared_load_order(configuration_file: Path, file_type_key: str):
-    raw_load_order = access_load_order_from_configuration(configuration_file, file_type_key)
-    desugared_load_order = desugar_files(raw_load_order, configuration_file, file_type_key)
+def get_desugared_load_order(load_order_configuration: Path, sugared_names_configuration: Path, file_type_key: str):
+    raw_load_order = access_load_order_from_configuration(load_order_configuration, file_type_key)
+    desugared_load_order = desugar_files(raw_load_order, sugared_names_configuration, file_type_key)
     return desugared_load_order
 
-def read_configuration_file_for_load_orders(configuration_file):
-    loose_files, esps = get_desugared_load_order(configuration_file, LOOSE_FILES_KEY), get_desugared_load_order(configuration_file, ESP_FILES_KEY)
+def read_configuration_file_for_load_orders(load_order_configuration, sugared_names_configuration):
+    loose_files = get_desugared_load_order(load_order_configuration, sugared_names_configuration, LOOSE_FILES_KEY)
+    esps = get_desugared_load_order(load_order_configuration, sugared_names_configuration, ESP_FILES_KEY)
     absolute_loose_files = [fs.LOOSE_FILES_PATH / path for path in loose_files]
     absolute_esps = [fs.ESPS_PATH / path for path in esps]
     return absolute_loose_files, absolute_esps
 
 def get_load_orders():
-    return read_configuration_file_for_load_orders(fs.LOAD_ORDER_CONFIGURATION_PATH)
+    return read_configuration_file_for_load_orders(fs.LOAD_ORDER_CONFIGURATION_PATH, fs.NAMES_CONFIG_PATH)
