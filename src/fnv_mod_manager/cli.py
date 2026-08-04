@@ -6,7 +6,7 @@ import fnv_mod_manager.fs as fs
 
 from fnv_mod_manager.esps import set_utimes_in_order
 from fnv_mod_manager.fs import extract_archive 
-from fnv_mod_manager.merge import  merge_mods_first_wins, create_symlink_make_parent_dirs_no_overwrite, create_rerooted_path
+from fnv_mod_manager.merge import  merge_mods_first_wins, create_symlink_make_parent_dirs_no_overwrite, create_rerooted_path, reroot_directory_tree_into_symlink_tree
 from fnv_mod_manager.config import get_load_orders
 
 from pathlib import Path
@@ -33,11 +33,16 @@ def install(args):
     for filepath in filepaths:
         extracted_mod_directory = try_extract_else_exit(filepath)
         mod_name = extracted_mod_directory.name
-        loose_files = walk_and_collect_loose_files(extracted_mod_directory)
-        esps = walk_and_collect_esps(extracted_mod_directory)
+        directory_to_search = extracted_mod_directory
+        for item in extracted_mod_directory.iterdir():
+            if item.is_dir() and item.name.lower() == "data":
+                directory_to_search = directory_to_search / item.name
 
-        reroot_files(loose_files, extracted_mod_directory, fs.LOOSE_FILES_PATH / mod_name)
-        reroot_files(esps, extracted_mod_directory, fs.ESPS_PATH/ mod_name)
+        loose_files = walk_and_collect_loose_files(directory_to_search)
+        esps = walk_and_collect_esps(directory_to_search)
+
+        reroot_files(loose_files, directory_to_search, fs.LOOSE_FILES_PATH / mod_name)
+        reroot_files(esps, directory_to_search, fs.ESPS_PATH/ mod_name)
 
 # returns a list of Path objects sorting all files and empty dirs as loose_files
 def walk_and_collect_loose_files(mod_dir):
@@ -65,11 +70,14 @@ def walk_and_collect_esps(mod_dir):
 def symlink_load_order(args):
     loose_files, esps = get_load_orders()
     # reverse slice makes our first wins code function like "normal" last wins code ala current mod managers
+    print(loose_files, esps)
     merge_mods_first_wins(loose_files[::-1])
     # TODO: confirm this is in the correct order
     set_utimes_in_order(esps)
     for esp in esps:
-        create_symlink_make_parent_dirs_no_overwrite(esp, fs.SYMLINKED_DATA_PATH)
+        print(f"esp to be made: {esp} and place to go: {fs.SYMLINKED_DATA_PATH}")
+        reroot_directory_tree_into_symlink_tree(esp, fs.SYMLINKED_DATA_PATH)
+        # create_symlink_make_parent_dirs_no_overwrite(esp, fs.SYMLINKED_DATA_PATH)
 
 def build_parser():
     parser = argparse.ArgumentParser(
