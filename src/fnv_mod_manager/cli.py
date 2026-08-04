@@ -6,54 +6,62 @@ import fnv_mod_manager.fs as fs
 
 from fnv_mod_manager.esps import set_utimes_in_order
 from fnv_mod_manager.fs import extract_archive 
-from fnv_mod_manager.merge import  merge_mods_first_wins, create_symlink_make_parent_dirs_no_overwrite
+from fnv_mod_manager.merge import  merge_mods_first_wins, create_symlink_make_parent_dirs_no_overwrite, create_rerooted_path
 from fnv_mod_manager.config import get_load_orders
 
 from pathlib import Path
 
 CLI_NAME = 'fnvmm'
 
+def try_extract_else_exit(filepath: Path):
+    try:
+        destination = extract_archive(filepath, fs.MODS_PATH)
+    except subprocess.CalledProcessError:
+        print(f"Error: failed to extract {filepath}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Installed {filepath} to {destination}")
+    return destination
+
+def reroot_files(file_paths, source_folder, destination_folder):
+    for file_path in file_paths:
+        symlink_destination = create_rerooted_path(file_path, source_folder, destination_folder)
+        create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
 
 # TODO: BUGFIX: the loose_files esps creation should have the same issue of potential accidental merges with mods/ base folders with the same name
 def install(args):
     filepaths = args.filepaths
     for filepath in filepaths:
-        try:
-            destination = extract_archive(filepath, fs.MODS_PATH)
-        except subprocess.CalledProcessError:
-            print(f"Error: failed to extract {filepath}", file=sys.stderr)
-            sys.exit(1)
-        print(f"Installed {filepath} to {destination}")
-        mod_name = destination.name
-        loose_files, esps = walk_and_sort_paths(destination)
-        for file_path_group, staging_root, file_type in zip(
-            [loose_files, esps],
-            [fs.LOOSE_FILES_PATH, fs.ESPS_PATH],
-            ["loose files", "esps"],
-        ):
-            for file_path in file_path_group:
-                relative_path = file_path.relative_to(destination)
-                symlink_destination = staging_root / mod_name / relative_path
-                create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
-            print(f"Staged {file_type} under {staging_root / mod_name}")    
+        extracted_mod_directory = try_extract_else_exit(filepath)
+        mod_name = extracted_mod_directory.name
+        loose_files = walk_and_collect_loose_files(extracted_mod_directory)
+        esps = walk_and_collect_esps(extracted_mod_directory)
 
-# returns a list of Path objects sorting all files and empty dirs as loose_files or esps
-def walk_and_sort_paths(mod_dir):
-    esps = []
+        reroot_files(loose_files, extracted_mod_directory, fs.LOOSE_FILES_PATH / mod_name)
+        reroot_files(esps, extracted_mod_directory, fs.ESPS_PATH/ mod_name)
+
+# returns a list of Path objects sorting all files and empty dirs as loose_files
+def walk_and_collect_loose_files(mod_dir):
     loose_files = []
     for dir_path, dir_names, file_names in mod_dir.walk():
-        if not dir_names and not file_names:
+        if not dir_names and not file_names and dir_path != mod_dir:
             loose_files.append(dir_path)
         for file_name in file_names: 
             file_path = dir_path / file_name
-            if file_path.suffix == ".esp" or file_path.suffix == ".esm":
-                esps.append(file_path)
-            else:
+            if file_path.suffix.lower() != ".esp" and file_path.suffix.lower() != ".esm":
                 loose_files.append(file_path)
-    return loose_files, esps
+    return loose_files
+
+# returns a list of Path objects sorting all files and empty dirs as esps
+def walk_and_collect_esps(mod_dir):
+    esps = []
+    for dir_path, dir_names, file_names in mod_dir.walk():
+        for file_name in file_names: 
+            file_path = dir_path / file_name
+            if file_path.suffix.lower() == ".esp" or file_path.suffix.lower() == ".esm":
+                esps.append(file_path)
+    return esps
 
 # TODO: add flags to specify destinations, esps-only, dry run, loose_files only
-# this has blurred responsibilities because it knows merge logic
 def symlink_load_order(args):
     loose_files, esps = get_load_orders()
     # reverse slice makes our first wins code function like "normal" last wins code ala current mod managers

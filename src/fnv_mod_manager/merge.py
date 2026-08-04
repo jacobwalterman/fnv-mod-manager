@@ -11,6 +11,8 @@ def collect_file_and_empty_dir_paths(root_dir: Path):
                     paths.append(dirpath)
                 for name in filenames:
                     paths.append(Path.joinpath(dirpath, name))
+        else:
+            paths.append(Path.joinpath(root_dir, item))
     return paths
 
 # symlinks all directory files and dirs onto symlink_tree_root as if symlink_tree_root replaced directory_root

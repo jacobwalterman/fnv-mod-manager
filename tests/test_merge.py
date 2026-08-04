@@ -2,6 +2,15 @@ import pytest
 from fnv_mod_manager.merge import collect_file_and_empty_dir_paths, reroot_directory_tree_into_symlink_tree
 
 
+
+def test_collect_file_and_empty_dir_paths_collects_loose_file_in_root(tmp_path):
+    mod = tmp_path / "mod_a"
+    mod.mkdir(parents=True)
+    (mod / "important.dll").write_text("fake dll data")
+    collected = collect_file_and_empty_dir_paths(mod)
+    assert set(collected) == {mod / "important.dll"}
+
+
 def test_collect_file_and_empty_dir_paths_collects_single_file(tmp_path):
     mod = tmp_path / "mod_a"
     (mod / "Textures").mkdir(parents=True)
