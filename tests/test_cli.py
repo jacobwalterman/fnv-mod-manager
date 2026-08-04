@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import fnv_mod_manager.cli as cli
 import fnv_mod_manager.fs as fs
+import pytest
 
 
 # --- walk_and_collect_loose_files ---
@@ -216,6 +217,47 @@ def _patch_store_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(fs, "MODS_PATH", tmp_path / "store" / "mods")
     monkeypatch.setattr(fs, "LOOSE_FILES_PATH", tmp_path / "store" / "loose-files")
     monkeypatch.setattr(fs, "ESPS_PATH", tmp_path / "store" / "esps")
+
+
+def test_install_uses_data_folder_as_root_when_present(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+
+    def build(mod_dir):
+        (mod_dir).mkdir(parents=True)
+        (mod_dir / "readme.txt").write_text("ignore me")
+        (mod_dir / "Data" / "Textures").mkdir(parents=True)
+        (mod_dir / "Data" / "Textures" / "armor.dds").write_text("fake texture data")
+        (mod_dir / "Data" / "plugin.esp").write_text("fake esp data")
+
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_c", build))
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_c.7z"])
+    cli.install(args)
+
+    loose_link = fs.LOOSE_FILES_PATH / "mod_c" / "Textures" / "armor.dds"
+    esp_link = fs.ESPS_PATH / "mod_c" / "plugin.esp"
+    assert loose_link.resolve() == (fs.MODS_PATH / "mod_c" / "Data" / "Textures" / "armor.dds").resolve()
+    assert esp_link.resolve() == (fs.MODS_PATH / "mod_c" / "Data" / "plugin.esp").resolve()
+
+    # readme.txt lived outside Data, so it should never get staged
+    assert not (fs.LOOSE_FILES_PATH / "mod_c" / "readme.txt").exists()
+    # and the "Data" prefix itself shouldn't leak into the staged tree
+    assert not (fs.LOOSE_FILES_PATH / "mod_c" / "Data").exists()
+
+
+@pytest.mark.parametrize("data_name", ["data", "Data", "DATA", "DaTa"])
+def test_install_data_folder_case_insensitive(tmp_path, monkeypatch, data_name):
+    _patch_store_paths(monkeypatch, tmp_path)
+
+    def build(mod_dir):
+        (mod_dir / data_name).mkdir(parents=True)
+        (mod_dir / data_name / "plugin.esp").write_text("fake esp data")
+
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_d", build))
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_d.7z"])
+    cli.install(args)
+
+    esp_link = fs.ESPS_PATH / "mod_d" / "plugin.esp"
+    assert esp_link.resolve() == (fs.MODS_PATH / "mod_d" / data_name / "plugin.esp")
 
 
 def test_install_stages_loose_files_and_esps_separately(tmp_path, monkeypatch):
