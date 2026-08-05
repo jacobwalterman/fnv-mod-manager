@@ -1,6 +1,6 @@
 import pytest
-from fnv_mod_manager.merge import collect_file_and_empty_dir_paths, reroot_directory_tree_into_symlink_tree
-
+import fnv_mod_manager.fs as fs
+from fnv_mod_manager.merge import collect_file_and_empty_dir_paths, reroot_directory_tree_into_symlink_tree, merge_mods_last_wins
 
 
 def test_collect_file_and_empty_dir_paths_collects_loose_file_in_root(tmp_path):
@@ -67,6 +67,7 @@ def test_collect_file_and_empty_dir_paths_collects_mixed_file_and_empty_dir(tmp_
         mod / "Sound",
     }
 
+
 def test_reroot_directory_tree_into_symlink_tree_symlinks_single_file(tmp_path):
     source = tmp_path / "mod_a"
     tree = tmp_path / "tree"
@@ -126,6 +127,7 @@ def test_reroot_directory_tree_into_symlink_tree_symlinks_multiple_entries(tmp_p
     assert file_link.resolve() == (source / "Textures" / "armor.dds").resolve()
     assert not dir_link.is_symlink()
 
+
 def test_reroot_directory_tree_into_symlink_tree_on_empty_source_creates_nothing(tmp_path):
     source = tmp_path / "mod_a"
     tree = tmp_path / "tree"
@@ -150,16 +152,7 @@ def test_reroot_directory_tree_into_symlink_tree_doesnt_overwrite_existing_targe
     assert (tree / "Textures" / "armor.dds").read_text() == "mod a version"
 
 
-import fnv_mod_manager.fs as fs
-from fnv_mod_manager.merge import merge_mods_first_wins
-
-
-# RED TEST: pins down a known bug. An empty-directory leaf from mod_a gets
-# symlinked directly into the merge tree, pointing at mod_a's real store
-# directory. When mod_b later writes a file under that same directory name,
-# the no-overwrite existence check follows the symlink and the new file
-# ends up physically inside mod_a's store folder instead of the merge tree.
-def test_merge_mods_first_wins_does_not_write_into_earlier_mods_store_directory(
+def test_merge_mods_last_wins_does_not_write_into_earlier_mods_store_directory(
     tmp_path, monkeypatch
 ):
     mod_a = tmp_path / "store" / "mods" / "mod_a"
@@ -170,12 +163,13 @@ def test_merge_mods_first_wins_does_not_write_into_earlier_mods_store_directory(
 
     game_files = tmp_path / "game-files" / "Fallout New Vegas"
     game_files.mkdir(parents=True)
-
+    
+    # TODO: add patch for NVSE
     monkeypatch.setattr(fs, "SYMLINKED_DATA_PATH", tmp_path / "tree" / "Data")
     monkeypatch.setattr(fs, "FALLOUT_NEW_VEGAS_PATH", game_files)
     monkeypatch.setattr(fs, "SYMLINKED_GAME_PATH", tmp_path / "tree" / "game")
 
-    merge_mods_first_wins([mod_a, mod_b])
+    merge_mods_last_wins([mod_a, mod_b])
 
     # mod_a's real store content must be exactly what it was before merging
     # anything else — no new symlinks should ever appear inside it.

@@ -6,7 +6,7 @@ import fnv_mod_manager.fs as fs
 
 from fnv_mod_manager.esps import set_utimes_in_order
 from fnv_mod_manager.fs import extract_archive 
-from fnv_mod_manager.merge import  merge_mods_first_wins, create_symlink_make_parent_dirs_no_overwrite, create_rerooted_path, reroot_directory_tree_into_symlink_tree
+from fnv_mod_manager.merge import  merge_mods_last_wins, create_symlink_make_parent_dirs_no_overwrite, create_rerooted_path, reroot_directory_tree_into_symlink_tree
 from fnv_mod_manager.config import get_load_orders
 
 from pathlib import Path
@@ -70,8 +70,7 @@ def walk_and_collect_esps(mod_dir):
 def symlink_load_order(args):
     loose_files, esps = get_load_orders()
     # reverse slice makes our first wins code function like "normal" last wins code ala current mod managers
-    print(loose_files, esps)
-    merge_mods_first_wins(loose_files[::-1])
+    merge_mods_last_wins(loose_files)
     # TODO: confirm this is in the correct order
     set_utimes_in_order(esps)
     for esp in esps:

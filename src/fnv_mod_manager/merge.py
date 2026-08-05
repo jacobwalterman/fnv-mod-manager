@@ -33,8 +33,10 @@ def create_symlink_make_parent_dirs_no_overwrite(symlink_source: Path, symlink_d
     if not symlink_destination.exists():
         symlink_destination.symlink_to(symlink_source)
 
-# writes paths first wins
-def merge_mods_first_wins(root_dirs):
-    for root_dir in root_dirs:
-        reroot_directory_tree_into_symlink_tree(root_dir, fs.SYMLINKED_DATA_PATH)
+# writes paths last wins, symlink writing is first wins, so reversing makes it last wins
+def merge_mods_last_wins(data_dirs):
+    reversed_data_dirs = data_dirs[::-1]
+    for data_dir in reversed_data_dirs:
+        reroot_directory_tree_into_symlink_tree(data_dir, fs.SYMLINKED_DATA_PATH)
+    reroot_directory_tree_into_symlink_tree(fs.NVSE_PATH, fs.SYMLINKED_GAME_PATH)
     reroot_directory_tree_into_symlink_tree(fs.FALLOUT_NEW_VEGAS_PATH, fs.SYMLINKED_GAME_PATH)
