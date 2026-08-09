@@ -1,6 +1,7 @@
 import argparse
 import subprocess
 import sys
+import shutil
 
 import fnv_mod_manager.fs as fs
 
@@ -69,9 +70,10 @@ def walk_and_collect_esps(mod_dir):
 # TODO: add flags to specify destinations, esps-only, dry run, loose_files only
 def symlink_load_order(args):
     loose_files, esps = get_load_orders()
-    # reverse slice makes our first wins code function like "normal" last wins code ala current mod managers
+    # clearing old tree for new tree
+    if fs.SYMLINKED_GAME_PATH.is_dir():
+        shutil.rmtree(fs.SYMLINKED_GAME_PATH)
     merge_mods_last_wins(loose_files)
-    # TODO: confirm this is in the correct order
     set_utimes_in_order(esps)
     for esp in esps:
         print(f"esp to be made: {esp} and place to go: {fs.SYMLINKED_DATA_PATH}")
