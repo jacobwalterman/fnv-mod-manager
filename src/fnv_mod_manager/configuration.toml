@@ -1,7 +1,0 @@
-[loose_files]
-source_dir = "/loose_files"
-order = ["mod_a", "mod_b", "mod_c"]
-
-[esps]
-source_dir = "/esps"
-order = ["mod_a.esp", "mod_b.esp"]
