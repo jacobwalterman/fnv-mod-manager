@@ -9,6 +9,7 @@ import fnv_mod_manager.cli as cli
 import fnv_mod_manager.fs as fs
 import pytest
 
+from tomlkit.toml_file import TOMLFile
 
 # --- walk_and_collect_loose_files ---
 
@@ -312,3 +313,170 @@ def test_install_exits_and_stages_nothing_if_extraction_fails(tmp_path, monkeypa
 
     assert not fs.LOOSE_FILES_PATH.exists()
     assert not fs.ESPS_PATH.exists()
+ 
+ 
+def _patch_config_paths(monkeypatch, tmp_path):
+    load_order_path = tmp_path / "configuration.toml"
+    names_path = tmp_path / "names.toml"
+    load_order_path.write_text(
+        '[loose-files]\nload-order = []\n\n[esps]\nload-order = []\n'
+    )
+    names_path.write_text('[loose-files]\n\n[esps]\n')
+    monkeypatch.setattr(fs, "LOAD_ORDER_CONFIGURATION_PATH", load_order_path)
+    monkeypatch.setattr(fs, "NAMES_CONFIG_PATH", names_path)
+    return load_order_path, names_path
+ 
+ 
+def _fake_extract_archive_multi(builds):
+    """builds: {archive stem -> (mod_name, build_fn)}"""
+    def fake(filepath, dest_dir):
+        mod_name, build_fn = builds[filepath.stem]
+        mod_dir = dest_dir / mod_name
+        build_fn(mod_dir)
+        return mod_dir
+    return fake
+ 
+ 
+def test_install_prompt_includes_mod_name(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+    _patch_config_paths(monkeypatch, tmp_path)
+ 
+    def build(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
+ 
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_i", build))
+ 
+    seen_prompts = []
+    def fake_input(prompt):
+        seen_prompts.append(prompt)
+        return "Whatever"
+    monkeypatch.setattr("builtins.input", fake_input)
+ 
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_i.7z"])
+    cli.install(args)
+ 
+    assert "mod_i" in seen_prompts[0]
+ 
+ 
+def test_install_writes_name_to_loose_files_tables(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+ 
+    def build(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
+ 
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_a", build))
+    monkeypatch.setattr("builtins.input", lambda prompt: "Pretty Armor Mod")
+ 
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_a.7z"])
+    cli.install(args)
+ 
+    load_order = TOMLFile(load_order_path).read()
+    names = TOMLFile(names_path).read()
+ 
+    assert "Pretty Armor Mod" in load_order["loose-files"]["load-order"]
+    assert names["loose-files"]["Pretty Armor Mod"] == "mod_a"
+ 
+ 
+def test_install_writes_name_to_esps_table_only(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+ 
+    def build(mod_dir):
+        mod_dir.mkdir(parents=True)
+        (mod_dir / "plugin.esp").write_text("fake esp data")
+ 
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_e", build))
+    monkeypatch.setattr("builtins.input", lambda prompt: "Pretty Plugin")
+ 
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_e.7z"])
+    cli.install(args)
+ 
+    load_order = TOMLFile(load_order_path).read()
+    names = TOMLFile(names_path).read()
+ 
+    assert "Pretty Plugin" in load_order["esps"]["load-order"]
+    assert names["esps"]["Pretty Plugin"] == "mod_e"
+    # shouldn't leak into the other table
+    assert "Pretty Plugin" not in load_order["loose-files"]["load-order"]
+    assert "loose-files" not in names or "Pretty Plugin" not in names["loose-files"]
+ 
+ 
+def test_install_writes_name_to_both_tables_when_mod_has_both(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+ 
+    def build(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
+        (mod_dir / "plugin.esp").write_text("fake esp data")
+ 
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_c", build))
+    monkeypatch.setattr("builtins.input", lambda prompt: "Pretty Combo Mod")
+ 
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_c.7z"])
+    cli.install(args)
+ 
+    load_order = TOMLFile(load_order_path).read()
+    names = TOMLFile(names_path).read()
+ 
+    assert "Pretty Combo Mod" in load_order["loose-files"]["load-order"]
+    assert "Pretty Combo Mod" in load_order["esps"]["load-order"]
+    assert names["loose-files"]["Pretty Combo Mod"] == "mod_c"
+    assert names["esps"]["Pretty Combo Mod"] == "mod_c"
+ 
+ 
+def test_install_skips_naming_when_input_left_blank(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+ 
+    def build(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
+ 
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_f", build))
+    monkeypatch.setattr("builtins.input", lambda prompt: "   ")  # blank after strip
+ 
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_f.7z"])
+    cli.install(args)
+ 
+    load_order = TOMLFile(load_order_path).read()
+    names = TOMLFile(names_path).read()
+ 
+    assert load_order["loose-files"]["load-order"] == []
+    assert "loose-files" not in names or len(names["loose-files"]) == 0
+ 
+ 
+def test_install_prompts_once_per_mod_in_multi_install(tmp_path, monkeypatch):
+    _patch_store_paths(monkeypatch, tmp_path)
+    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+ 
+    def build_g(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
+ 
+    def build_h(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "weapon.dds").write_text("fake texture data")
+ 
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive_multi({
+        "mod_g": ("mod_g", build_g),
+        "mod_h": ("mod_h", build_h),
+    }))
+ 
+    prompts = iter(["Pretty Armor", "Pretty Weapon"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(prompts))
+ 
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_g.7z", tmp_path / "mod_h.7z"])
+    cli.install(args)
+ 
+    load_order = TOMLFile(load_order_path).read()
+    names = TOMLFile(names_path).read()
+ 
+    assert load_order["loose-files"]["load-order"] == ["Pretty Armor", "Pretty Weapon"]
+    assert names["loose-files"]["Pretty Armor"] == "mod_g"
+    assert names["loose-files"]["Pretty Weapon"] == "mod_h"
+ 
+

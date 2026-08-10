@@ -9,7 +9,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       devShells.${system}.default = pkgs.mkShell {
-        packages = [ pkgs.python312 pkgs.python312Packages.pytest pkgs.ruff pkgs.uv pkgs.p7zip ];
+        packages = [ pkgs.python312 pkgs.python312Packages.pytest pkgs.ruff pkgs.uv pkgs.p7zip pkgs.python312Packages.tomlkit ];
         shellHook = ''
           if [ ! -d .venv ]; then
             uv venv .venv

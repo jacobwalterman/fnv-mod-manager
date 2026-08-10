@@ -11,6 +11,8 @@ from fnv_mod_manager.merge import  merge_mods_last_wins, create_symlink_make_par
 from fnv_mod_manager.config import get_load_orders
 
 from pathlib import Path
+ 
+from tomlkit.toml_file import TOMLFile
 
 CLI_NAME = 'fnvmm'
 
@@ -28,19 +30,36 @@ def reroot_files(file_paths, source_folder, destination_folder):
         symlink_destination = create_rerooted_path(file_path, source_folder, destination_folder)
         create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
 
+
+def append_pretty_name_to_files(pretty_name, mod_name, table_name): 
+        f = TOMLFile(fs.LOAD_ORDER_CONFIGURATION_PATH)
+        load_order_toml = f.read()
+        load_order_toml[table_name]["load-order"].append(f"{pretty_name}")
+        f.write(load_order_toml)
+        f = TOMLFile(fs.NAMES_CONFIG_PATH)
+        pretty_names_toml = f.read()
+        pretty_names_toml[table_name][pretty_name] = mod_name
+        f.write(pretty_names_toml)
+
 # TODO: BUGFIX: the loose_files esps creation should have the same issue of potential accidental merges with mods/ base folders with the same name
 def install(args):
     filepaths = args.filepaths
+    names = dict()
     for filepath in filepaths:
         extracted_mod_directory = try_extract_else_exit(filepath)
         mod_name = extracted_mod_directory.name
+        pretty_name = input(f"Name for {mod_name}: ").strip()
         directory_to_search = extracted_mod_directory
         for item in extracted_mod_directory.iterdir():
             if item.is_dir() and item.name.lower() == "data":
                 directory_to_search = directory_to_search / item.name
-
         loose_files = walk_and_collect_loose_files(directory_to_search)
         esps = walk_and_collect_esps(directory_to_search)
+        if pretty_name:
+            if loose_files: 
+                append_pretty_name_to_files(pretty_name, mod_name, "loose-files")
+            if esps:
+                append_pretty_name_to_files(pretty_name, mod_name, "esps")
 
         reroot_files(loose_files, directory_to_search, fs.LOOSE_FILES_PATH / mod_name)
         reroot_files(esps, directory_to_search, fs.ESPS_PATH/ mod_name)
