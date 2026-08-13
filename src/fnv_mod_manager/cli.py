@@ -14,22 +14,27 @@ from pathlib import Path
  
 from tomlkit.toml_file import TOMLFile
 
+from hashlib import sha256
+
+from operator import itemgetter
+
+from contextlib import contextmanager
+
 CLI_NAME = 'fnvmm'
 
-def try_extract_else_exit(filepath: Path):
+def try_extract_else_exit(filepath: Path, extraction_destination):
     try:
-        destination = extract_archive(filepath, fs.MODS_PATH)
+        destination = extract_archive(filepath, extraction_destination)
     except subprocess.CalledProcessError:
         print(f"Error: failed to extract {filepath}", file=sys.stderr)
         sys.exit(1)
-    print(f"Installed {filepath} to {destination}")
+    # print(f"Installed {filepath} to {destination}")
     return destination
 
 def reroot_files(file_paths, source_folder, destination_folder):
     for file_path in file_paths:
         symlink_destination = create_rerooted_path(file_path, source_folder, destination_folder)
         create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
-
 
 def append_pretty_name_to_files(pretty_name, mod_name, table_name): 
         f = TOMLFile(fs.LOAD_ORDER_CONFIGURATION_PATH)
@@ -41,14 +46,46 @@ def append_pretty_name_to_files(pretty_name, mod_name, table_name):
         pretty_names_toml[table_name][pretty_name] = mod_name
         f.write(pretty_names_toml)
 
-# TODO: BUGFIX: the loose_files esps creation should have the same issue of potential accidental merges with mods/ base folders with the same name
+def make_hash_manifest_of_directory_contents(directory_to_hash_path, hash_manifest_path): 
+    file_paths_and_hashes = list()
+    for directory_path, subdirectory_names, file_names in directory_to_hash_path.walk():
+        for file_name in file_names:
+            file_path = directory_path / file_name
+            file_hash = get_hex_hash(file_path) 
+            file_paths_and_hashes.append((file_path.relative_to(directory_path).as_posix(), file_hash))
+    file_paths_and_hashes.sort(key=itemgetter(0))
+    with open(hash_manifest_path, "w") as f:
+        for file_path, file_hash in file_paths_and_hashes:
+            f.write(f"{file_path}:{file_hash}\n")
+
+def get_hex_hash(file_path):
+    with open(file_path, "rb") as f:
+        file_hasher = sha256()
+        file_hasher.update(f.read())
+    file_hash = file_hasher.hexdigest()
+    return file_hash
+
+def get_hash_id_for_directory(directory_path: Path):
+    with fs.use_temp_hash_manifest() as hash_manifest_path:
+        make_hash_manifest_of_directory_contents(directory_path, hash_manifest_path)
+        hash_id = get_hex_hash(hash_manifest_path)
+    return hash_id
+
 def install(args):
     filepaths = args.filepaths
-    names = dict()
     for filepath in filepaths:
-        extracted_mod_directory = try_extract_else_exit(filepath)
-        mod_name = extracted_mod_directory.name
-        pretty_name = input(f"Name for {mod_name}: ").strip()
+        with fs.use_temp_dir() as TEMPORARY_FILES_PATH:
+            extracted_mod_temp_directory = try_extract_else_exit(filepath, TEMPORARY_FILES_PATH)
+            mod_name = extracted_mod_temp_directory.name
+            hash_id = get_hash_id_for_directory(extracted_mod_temp_directory)
+            prospective_mod_path = fs.MODS_PATH / hash_id 
+            if prospective_mod_path.exists():
+                print(f"The path, {prospective_mod_path}, for {mod_name} is occupied! Unless something has gone wrong, {mod_name} has been installed previously.")
+                # go to next mod
+                continue
+            # TODO: investigate why I couldnt use Path.move_into seems safer
+            extracted_mod_directory = extracted_mod_temp_directory.rename(prospective_mod_path)
+        pretty_name = input(f"Pretty name for {mod_name}: ").strip()
         directory_to_search = extracted_mod_directory
         for item in extracted_mod_directory.iterdir():
             if item.is_dir() and item.name.lower() == "data":
@@ -57,12 +94,11 @@ def install(args):
         esps = walk_and_collect_esps(directory_to_search)
         if pretty_name:
             if loose_files: 
-                append_pretty_name_to_files(pretty_name, mod_name, "loose-files")
+                append_pretty_name_to_files(pretty_name, hash_id, "loose-files")
             if esps:
-                append_pretty_name_to_files(pretty_name, mod_name, "esps")
-
-        reroot_files(loose_files, directory_to_search, fs.LOOSE_FILES_PATH / mod_name)
-        reroot_files(esps, directory_to_search, fs.ESPS_PATH/ mod_name)
+                append_pretty_name_to_files(pretty_name, hash_id, "esps")
+        reroot_files(loose_files, directory_to_search, fs.LOOSE_FILES_PATH / hash_id)
+        reroot_files(esps, directory_to_search, fs.ESPS_PATH/ hash_id)
 
 # returns a list of Path objects sorting all files and empty dirs as loose_files
 def walk_and_collect_loose_files(mod_dir):
