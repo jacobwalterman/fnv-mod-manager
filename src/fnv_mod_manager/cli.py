@@ -166,8 +166,8 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog=CLI_NAME,
         description="Manages fnv mod manager",
-        epilog="I care about user issues, so please make a polite report/question " 
-        'if you have any persistent/unresolved issues! I consider things like '
+        epilog="I care about user issues, so please make a polite report/question "
+        "if you have any persistent/unresolved issues! I consider things like "
         'confusion and "stupid mistakes" to be ux issues and I\'m interested '
         "in addressing them, so don't be shy :).",
     )

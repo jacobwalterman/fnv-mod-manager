@@ -20,7 +20,7 @@ def collect_file_and_empty_dir_paths(root_dir: Path):
     return paths
 
 
-# symlinks all directory files and dirs onto symlink_tree_root 
+# symlinks all directory files and dirs onto symlink_tree_root
 # as if symlink_tree_root replaced directory_root
 def reroot_directory_tree_into_symlink_tree(
     directory_root: Path, symlink_tree_root: Path
