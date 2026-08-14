@@ -1,6 +1,11 @@
 import pytest
+
 import fnv_mod_manager.fs as fs
-from fnv_mod_manager.merge import collect_file_and_empty_dir_paths, reroot_directory_tree_into_symlink_tree, merge_mods_last_wins
+from fnv_mod_manager.merge import (
+    collect_file_and_empty_dir_paths,
+    merge_mods_last_wins,
+    reroot_directory_tree_into_symlink_tree,
+)
 
 
 def test_collect_file_and_empty_dir_paths_collects_loose_file_in_root(tmp_path):
@@ -128,7 +133,9 @@ def test_reroot_directory_tree_into_symlink_tree_symlinks_multiple_entries(tmp_p
     assert not dir_link.is_symlink()
 
 
-def test_reroot_directory_tree_into_symlink_tree_on_empty_source_creates_nothing(tmp_path):
+def test_reroot_directory_tree_into_symlink_tree_on_empty_source_creates_nothing(
+    tmp_path,
+):
     source = tmp_path / "mod_a"
     tree = tmp_path / "tree"
     source.mkdir()
@@ -138,7 +145,9 @@ def test_reroot_directory_tree_into_symlink_tree_on_empty_source_creates_nothing
     assert not tree.exists() or list(tree.iterdir()) == []
 
 
-def test_reroot_directory_tree_into_symlink_tree_doesnt_overwrite_existing_target(tmp_path):
+def test_reroot_directory_tree_into_symlink_tree_doesnt_overwrite_existing_target(
+    tmp_path,
+):
     mod_a = tmp_path / "mod_a"
     mod_b = tmp_path / "mod_b"
     tree = tmp_path / "tree"
@@ -163,7 +172,7 @@ def test_merge_mods_last_wins_does_not_write_into_earlier_mods_store_directory(
 
     game_files = tmp_path / "game-files" / "Fallout New Vegas"
     game_files.mkdir(parents=True)
-    
+
     # TODO: add patch for NVSE
     monkeypatch.setattr(fs, "SYMLINKED_DATA_PATH", tmp_path / "tree" / "Data")
     monkeypatch.setattr(fs, "FALLOUT_NEW_VEGAS_PATH", game_files)
