@@ -50,7 +50,17 @@ def build_layout(root: Path, user_name: str = USER_NAME) -> Layout:
         prefix_path / user_name / "Documents" / "My Games" / "FalloutNV"
     )
     symlinked_game_path = root / "Fallout New Vegas"
-
+    directories = (
+        symlinked_game_path,
+        prefix_path,
+        temporary_files_path,
+        root_files_path,
+        store_path,
+        ini_path,
+        game_files_path,
+    )
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
     return Layout(
         program_root=root,
         names_config_path=root / "names.toml",
