@@ -3,7 +3,7 @@ from pathlib import Path
 
 import tomllib
 
-import fnv_mod_manager.fs as fs
+from fnv_mod_manager.fs import Layout
 
 LOOSE_FILES_KEY = "loose-files"
 ESP_FILES_KEY = "esps"
@@ -66,21 +66,17 @@ def get_desugared_load_order(
     return desugared_load_order
 
 
-def read_configuration_file_for_load_orders(
-    load_order_configuration, sugared_names_configuration
-):
+def read_configuration_file_for_load_orders(layout: Layout):
     loose_files = get_desugared_load_order(
-        load_order_configuration, sugared_names_configuration, LOOSE_FILES_KEY
+        layout.load_order_configuration_path, layout.names_config_path, LOOSE_FILES_KEY
     )
     esps = get_desugared_load_order(
-        load_order_configuration, sugared_names_configuration, ESP_FILES_KEY
+        layout.load_order_configuration_path, layout.names_config_path, ESP_FILES_KEY
     )
-    absolute_loose_files = [fs.LOOSE_FILES_PATH / path for path in loose_files]
-    absolute_esps = [fs.ESPS_PATH / path for path in esps]
+    absolute_loose_files = [layout.loose_files_path / path for path in loose_files]
+    absolute_esps = [layout.esps_path / path for path in esps]
     return absolute_loose_files, absolute_esps
 
 
-def get_load_orders():
-    return read_configuration_file_for_load_orders(
-        fs.LOAD_ORDER_CONFIGURATION_PATH, fs.NAMES_CONFIG_PATH
-    )
+def get_load_orders(layout: Layout):
+    return read_configuration_file_for_load_orders(layout)

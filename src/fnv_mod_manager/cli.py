@@ -11,7 +11,7 @@ from tomlkit.toml_file import TOMLFile
 import fnv_mod_manager.fs as fs
 from fnv_mod_manager.config import get_load_orders
 from fnv_mod_manager.esps import set_utimes_in_order
-from fnv_mod_manager.fs import extract_archive
+from fnv_mod_manager.fs import Layout, extract_archive
 from fnv_mod_manager.merge import (
     create_rerooted_path,
     create_symlink_make_parent_dirs_no_overwrite,
@@ -40,12 +40,12 @@ def reroot_files(file_paths, source_folder, destination_folder):
         create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
 
 
-def append_pretty_name_to_files(pretty_name, mod_name, table_name):
-    f = TOMLFile(fs.LOAD_ORDER_CONFIGURATION_PATH)
+def append_pretty_name_to_files(pretty_name, mod_name, table_name, layout):
+    f = TOMLFile(layout.load_order_configuration_path)
     load_order_toml = f.read()
     load_order_toml[table_name]["load-order"].append(f"{pretty_name}")
     f.write(load_order_toml)
-    f = TOMLFile(fs.NAMES_CONFIG_PATH)
+    f = TOMLFile(layout.names_config_path)
     pretty_names_toml = f.read()
     pretty_names_toml[table_name][pretty_name] = mod_name
     f.write(pretty_names_toml)
@@ -76,23 +76,23 @@ def get_hex_hash(file_path):
     return file_hash
 
 
-def get_hash_id_for_directory(directory_path: Path):
-    with fs.use_temp_hash_manifest() as hash_manifest_path:
+def get_hash_id_for_directory(directory_path: Path, layout: Layout):
+    with fs.use_temp_hash_manifest(layout.hash_manifest_path) as hash_manifest_path:
         make_hash_manifest_of_directory_contents(directory_path, hash_manifest_path)
         hash_id = get_hex_hash(hash_manifest_path)
     return hash_id
 
 
-def install(args):
+def install(args, layout=fs.default_layout()):
     filepaths = args.filepaths
     for filepath in filepaths:
-        with fs.use_temp_dir() as TEMPORARY_FILES_PATH:
+        with fs.use_temp_dir(layout.temporary_files_path) as TEMPORARY_FILES_PATH:
             extracted_mod_temp_directory = try_extract_else_exit(
                 filepath, TEMPORARY_FILES_PATH
             )
             mod_name = extracted_mod_temp_directory.name
-            hash_id = get_hash_id_for_directory(extracted_mod_temp_directory)
-            prospective_mod_path = fs.MODS_PATH / hash_id
+            hash_id = get_hash_id_for_directory(extracted_mod_temp_directory, layout)
+            prospective_mod_path = layout.mods_path / hash_id
             if prospective_mod_path.exists():
                 print(
                     f"The path, {prospective_mod_path}, for {mod_name} is occupied! \
@@ -114,11 +114,13 @@ def install(args):
         esps = walk_and_collect_esps(directory_to_search)
         if pretty_name:
             if loose_files:
-                append_pretty_name_to_files(pretty_name, hash_id, "loose-files")
+                append_pretty_name_to_files(pretty_name, hash_id, "loose-files", layout)
             if esps:
-                append_pretty_name_to_files(pretty_name, hash_id, "esps")
-        reroot_files(loose_files, directory_to_search, fs.LOOSE_FILES_PATH / hash_id)
-        reroot_files(esps, directory_to_search, fs.ESPS_PATH / hash_id)
+                append_pretty_name_to_files(pretty_name, hash_id, "esps", layout)
+        reroot_files(
+            loose_files, directory_to_search, layout.loose_files_path / hash_id
+        )
+        reroot_files(esps, directory_to_search, layout.esps_path / hash_id)
 
 
 # returns a list of Path objects sorting all files and empty dirs as loose_files
@@ -149,16 +151,17 @@ def walk_and_collect_esps(mod_dir):
 
 
 # TODO: add flags to specify destinations, esps-only, dry run, loose_files only
-def symlink_load_order(args):
-    loose_files, esps = get_load_orders()
+def symlink_load_order(args, layout=fs.default_layout()):
+
+    loose_files, esps = get_load_orders(layout)
     # clearing old tree for new tree
-    if fs.SYMLINKED_GAME_PATH.is_dir():
-        shutil.rmtree(fs.SYMLINKED_GAME_PATH)
-    merge_mods_last_wins(loose_files)
+    if layout.symlinked_game_path.is_dir():
+        shutil.rmtree(layout.symlinked_game_path)
+    merge_mods_last_wins(loose_files, layout)
     set_utimes_in_order(esps)
     for esp in esps:
-        print(f"esp to be made: {esp} and place to go: {fs.SYMLINKED_DATA_PATH}")
-        reroot_directory_tree_into_symlink_tree(esp, fs.SYMLINKED_DATA_PATH)
+        print(f"esp to be made: {esp} and place to go: {layout.symlinked_data_path}")
+        reroot_directory_tree_into_symlink_tree(esp, layout.symlinked_data_path)
         # create_symlink_make_parent_dirs_no_overwrite(esp, fs.SYMLINKED_DATA_PATH)
 
 

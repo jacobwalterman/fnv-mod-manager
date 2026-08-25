@@ -205,6 +205,9 @@ def test_reroot_files_does_not_overwrite_existing_destination(tmp_path):
 
 
 # --- install ---
+#
+# ASSUMPTION: cli.install(args, layout) — adjust call sites below if your
+# actual signature differs (e.g. keyword arg, different position).
 
 
 def _fake_extract_archive(mod_name, build_fn):
@@ -214,147 +217,6 @@ def _fake_extract_archive(mod_name, build_fn):
         return mod_dir
 
     return fake
-
-
-def _patch_store_paths(monkeypatch, tmp_path):
-    mods_path = tmp_path / "store" / "mods"
-    loose_files_path = tmp_path / "store" / "loose-files"
-    esps_path = tmp_path / "store" / "esps"
-    mods_path.mkdir(parents=True, exist_ok=True)
-    loose_files_path.mkdir(parents=True, exist_ok=True)
-    esps_path.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(fs, "MODS_PATH", mods_path)
-    monkeypatch.setattr(fs, "LOOSE_FILES_PATH", loose_files_path)
-    monkeypatch.setattr(fs, "ESPS_PATH", esps_path)
-
-    temp_files_path = tmp_path / "tmp"
-    temp_files_path.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(fs, "TEMPORARY_FILES_PATH", temp_files_path)
-    monkeypatch.setattr(fs, "HASH_MANIFEST_PATH", temp_files_path / "hash-manifest")
-
-
-def _only_installed_hash_id(mods_path):
-    installed = list(mods_path.iterdir())
-    assert len(installed) == 1, (
-        f"expected exactly one installed mod, found {[p.name for p in installed]}"
-    )
-    return installed[0].name
-
-
-def test_install_uses_data_folder_as_root_when_present(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-
-    def build(mod_dir):
-        (mod_dir).mkdir(parents=True)
-        (mod_dir / "readme.txt").write_text("ignore me")
-        (mod_dir / "Data" / "Textures").mkdir(parents=True)
-        (mod_dir / "Data" / "Textures" / "armor.dds").write_text("fake texture data")
-        (mod_dir / "Data" / "plugin.esp").write_text("fake esp data")
-
-    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_c", build))
-    args = SimpleNamespace(filepaths=[tmp_path / "mod_c.7z"])
-    cli.install(args)
-
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    loose_link = fs.LOOSE_FILES_PATH / hash_id / "Textures" / "armor.dds"
-    esp_link = fs.ESPS_PATH / hash_id / "plugin.esp"
-    assert (
-        loose_link.resolve()
-        == (fs.MODS_PATH / hash_id / "Data" / "Textures" / "armor.dds").resolve()
-    )
-    assert (
-        esp_link.resolve() == (fs.MODS_PATH / hash_id / "Data" / "plugin.esp").resolve()
-    )
-    assert not (fs.LOOSE_FILES_PATH / hash_id / "readme.txt").exists()
-    assert not (fs.LOOSE_FILES_PATH / hash_id / "Data").exists()
-
-
-@pytest.mark.parametrize("data_name", ["data", "Data", "DATA", "DaTa"])
-def test_install_data_folder_case_insensitive(tmp_path, monkeypatch, data_name):
-    _patch_store_paths(monkeypatch, tmp_path)
-
-    def build(mod_dir):
-        (mod_dir / data_name).mkdir(parents=True)
-        (mod_dir / data_name / "plugin.esp").write_text("fake esp data")
-
-    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_d", build))
-    args = SimpleNamespace(filepaths=[tmp_path / "mod_d.7z"])
-    cli.install(args)
-
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    esp_link = fs.ESPS_PATH / hash_id / "plugin.esp"
-    assert (
-        esp_link.resolve()
-        == (fs.MODS_PATH / hash_id / data_name / "plugin.esp").resolve()
-    )
-
-
-def test_install_stages_loose_files_and_esps_separately(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-
-    def build(mod_dir):
-        (mod_dir / "Textures").mkdir(parents=True)
-        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
-        (mod_dir / "plugin.esp").write_text("fake esp data")
-
-    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_a", build))
-    args = SimpleNamespace(filepaths=[tmp_path / "mod_a.7z"])
-    cli.install(args)
-
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    loose_link = fs.LOOSE_FILES_PATH / hash_id / "Textures" / "armor.dds"
-    esp_link = fs.ESPS_PATH / hash_id / "plugin.esp"
-    assert (
-        loose_link.resolve()
-        == (fs.MODS_PATH / hash_id / "Textures" / "armor.dds").resolve()
-    )
-    assert esp_link.resolve() == (fs.MODS_PATH / hash_id / "plugin.esp").resolve()
-    assert not (fs.LOOSE_FILES_PATH / hash_id / "plugin.esp").exists()
-
-
-def test_install_stages_empty_directory_as_real_directory(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-
-    def build(mod_dir):
-        (mod_dir / "Sound").mkdir(parents=True)
-
-    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_b", build))
-    args = SimpleNamespace(filepaths=[tmp_path / "mod_b.7z"])
-    cli.install(args)
-
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    staged = fs.LOOSE_FILES_PATH / hash_id / "Sound"
-    assert staged.is_dir()
-    assert not staged.is_symlink()
-
-
-def test_install_exits_and_stages_nothing_if_extraction_fails(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-
-    def fake_extract_archive(filepath, dest_dir):
-        raise subprocess.CalledProcessError(returncode=2, cmd=["7z"])
-
-    monkeypatch.setattr(cli, "extract_archive", fake_extract_archive)
-
-    args = SimpleNamespace(filepaths=[tmp_path / "bad_mod.7z"])
-    with pytest.raises(SystemExit):
-        cli.install(args)
-
-    assert list(fs.MODS_PATH.iterdir()) == []
-    assert list(fs.LOOSE_FILES_PATH.iterdir()) == []
-    assert list(fs.ESPS_PATH.iterdir()) == []
-
-
-def _patch_config_paths(monkeypatch, tmp_path):
-    load_order_path = tmp_path / "configuration.toml"
-    names_path = tmp_path / "names.toml"
-    load_order_path.write_text(
-        "[loose-files]\nload-order = []\n\n[esps]\nload-order = []\n"
-    )
-    names_path.write_text("[loose-files]\n\n[esps]\n")
-    monkeypatch.setattr(fs, "LOAD_ORDER_CONFIGURATION_PATH", load_order_path)
-    monkeypatch.setattr(fs, "NAMES_CONFIG_PATH", names_path)
-    return load_order_path, names_path
 
 
 def _fake_extract_archive_multi(builds):
@@ -369,9 +231,138 @@ def _fake_extract_archive_multi(builds):
     return fake
 
 
+def _build_test_layout(tmp_path):
+    layout = fs.build_layout(tmp_path)
+    layout.mods_path.mkdir(parents=True, exist_ok=True)
+    layout.loose_files_path.mkdir(parents=True, exist_ok=True)
+    layout.esps_path.mkdir(parents=True, exist_ok=True)
+    layout.temporary_files_path.mkdir(parents=True, exist_ok=True)
+    return layout
+
+
+def _write_config_files(layout):
+    layout.load_order_configuration_path.write_text(
+        "[loose-files]\nload-order = []\n\n[esps]\nload-order = []\n"
+    )
+    layout.names_config_path.write_text("[loose-files]\n\n[esps]\n")
+
+
+def _only_installed_hash_id(mods_path):
+    installed = list(mods_path.iterdir())
+    assert len(installed) == 1, (
+        f"expected exactly one installed mod, found {[p.name for p in installed]}"
+    )
+    return installed[0].name
+
+
+def test_install_uses_data_folder_as_root_when_present(tmp_path, monkeypatch):
+    layout = _build_test_layout(tmp_path)
+
+    def build(mod_dir):
+        (mod_dir).mkdir(parents=True)
+        (mod_dir / "readme.txt").write_text("ignore me")
+        (mod_dir / "Data" / "Textures").mkdir(parents=True)
+        (mod_dir / "Data" / "Textures" / "armor.dds").write_text("fake texture data")
+        (mod_dir / "Data" / "plugin.esp").write_text("fake esp data")
+
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_c", build))
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_c.7z"])
+    cli.install(args, layout)
+
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    loose_link = layout.loose_files_path / hash_id / "Textures" / "armor.dds"
+    esp_link = layout.esps_path / hash_id / "plugin.esp"
+    assert (
+        loose_link.resolve()
+        == (layout.mods_path / hash_id / "Data" / "Textures" / "armor.dds").resolve()
+    )
+    assert (
+        esp_link.resolve()
+        == (layout.mods_path / hash_id / "Data" / "plugin.esp").resolve()
+    )
+    assert not (layout.loose_files_path / hash_id / "readme.txt").exists()
+    assert not (layout.loose_files_path / hash_id / "Data").exists()
+
+
+@pytest.mark.parametrize("data_name", ["data", "Data", "DATA", "DaTa"])
+def test_install_data_folder_case_insensitive(tmp_path, monkeypatch, data_name):
+    layout = _build_test_layout(tmp_path)
+
+    def build(mod_dir):
+        (mod_dir / data_name).mkdir(parents=True)
+        (mod_dir / data_name / "plugin.esp").write_text("fake esp data")
+
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_d", build))
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_d.7z"])
+    cli.install(args, layout)
+
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    esp_link = layout.esps_path / hash_id / "plugin.esp"
+    assert (
+        esp_link.resolve()
+        == (layout.mods_path / hash_id / data_name / "plugin.esp").resolve()
+    )
+
+
+def test_install_stages_loose_files_and_esps_separately(tmp_path, monkeypatch):
+    layout = _build_test_layout(tmp_path)
+
+    def build(mod_dir):
+        (mod_dir / "Textures").mkdir(parents=True)
+        (mod_dir / "Textures" / "armor.dds").write_text("fake texture data")
+        (mod_dir / "plugin.esp").write_text("fake esp data")
+
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_a", build))
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_a.7z"])
+    cli.install(args, layout)
+
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    loose_link = layout.loose_files_path / hash_id / "Textures" / "armor.dds"
+    esp_link = layout.esps_path / hash_id / "plugin.esp"
+    assert (
+        loose_link.resolve()
+        == (layout.mods_path / hash_id / "Textures" / "armor.dds").resolve()
+    )
+    assert esp_link.resolve() == (layout.mods_path / hash_id / "plugin.esp").resolve()
+    assert not (layout.loose_files_path / hash_id / "plugin.esp").exists()
+
+
+def test_install_stages_empty_directory_as_real_directory(tmp_path, monkeypatch):
+    layout = _build_test_layout(tmp_path)
+
+    def build(mod_dir):
+        (mod_dir / "Sound").mkdir(parents=True)
+
+    monkeypatch.setattr(cli, "extract_archive", _fake_extract_archive("mod_b", build))
+    args = SimpleNamespace(filepaths=[tmp_path / "mod_b.7z"])
+    cli.install(args, layout)
+
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    staged = layout.loose_files_path / hash_id / "Sound"
+    assert staged.is_dir()
+    assert not staged.is_symlink()
+
+
+def test_install_exits_and_stages_nothing_if_extraction_fails(tmp_path, monkeypatch):
+    layout = _build_test_layout(tmp_path)
+
+    def fake_extract_archive(filepath, dest_dir):
+        raise subprocess.CalledProcessError(returncode=2, cmd=["7z"])
+
+    monkeypatch.setattr(cli, "extract_archive", fake_extract_archive)
+
+    args = SimpleNamespace(filepaths=[tmp_path / "bad_mod.7z"])
+    with pytest.raises(SystemExit):
+        cli.install(args, layout)
+
+    assert list(layout.mods_path.iterdir()) == []
+    assert list(layout.loose_files_path.iterdir()) == []
+    assert list(layout.esps_path.iterdir()) == []
+
+
 def test_install_prompt_includes_mod_name(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-    _patch_config_paths(monkeypatch, tmp_path)
+    layout = _build_test_layout(tmp_path)
+    _write_config_files(layout)
 
     def build(mod_dir):
         (mod_dir / "Textures").mkdir(parents=True)
@@ -388,14 +379,14 @@ def test_install_prompt_includes_mod_name(tmp_path, monkeypatch):
     monkeypatch.setattr("builtins.input", fake_input)
 
     args = SimpleNamespace(filepaths=[tmp_path / "mod_i.7z"])
-    cli.install(args)
+    cli.install(args, layout)
 
     assert "mod_i" in seen_prompts[0]
 
 
 def test_install_writes_name_to_loose_files_tables(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+    layout = _build_test_layout(tmp_path)
+    _write_config_files(layout)
 
     def build(mod_dir):
         (mod_dir / "Textures").mkdir(parents=True)
@@ -405,19 +396,19 @@ def test_install_writes_name_to_loose_files_tables(tmp_path, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: "Pretty Armor Mod")
 
     args = SimpleNamespace(filepaths=[tmp_path / "mod_a.7z"])
-    cli.install(args)
+    cli.install(args, layout)
 
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    load_order = TOMLFile(load_order_path).read()
-    names = TOMLFile(names_path).read()
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    load_order = TOMLFile(layout.load_order_configuration_path).read()
+    names = TOMLFile(layout.names_config_path).read()
 
     assert "Pretty Armor Mod" in load_order["loose-files"]["load-order"]
     assert names["loose-files"]["Pretty Armor Mod"] == hash_id
 
 
 def test_install_writes_name_to_esps_table_only(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+    layout = _build_test_layout(tmp_path)
+    _write_config_files(layout)
 
     def build(mod_dir):
         mod_dir.mkdir(parents=True)
@@ -427,11 +418,11 @@ def test_install_writes_name_to_esps_table_only(tmp_path, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: "Pretty Plugin")
 
     args = SimpleNamespace(filepaths=[tmp_path / "mod_e.7z"])
-    cli.install(args)
+    cli.install(args, layout)
 
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    load_order = TOMLFile(load_order_path).read()
-    names = TOMLFile(names_path).read()
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    load_order = TOMLFile(layout.load_order_configuration_path).read()
+    names = TOMLFile(layout.names_config_path).read()
 
     assert "Pretty Plugin" in load_order["esps"]["load-order"]
     assert names["esps"]["Pretty Plugin"] == hash_id
@@ -440,8 +431,8 @@ def test_install_writes_name_to_esps_table_only(tmp_path, monkeypatch):
 
 
 def test_install_writes_name_to_both_tables_when_mod_has_both(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+    layout = _build_test_layout(tmp_path)
+    _write_config_files(layout)
 
     def build(mod_dir):
         (mod_dir / "Textures").mkdir(parents=True)
@@ -452,11 +443,11 @@ def test_install_writes_name_to_both_tables_when_mod_has_both(tmp_path, monkeypa
     monkeypatch.setattr("builtins.input", lambda prompt: "Pretty Combo Mod")
 
     args = SimpleNamespace(filepaths=[tmp_path / "mod_c.7z"])
-    cli.install(args)
+    cli.install(args, layout)
 
-    hash_id = _only_installed_hash_id(fs.MODS_PATH)
-    load_order = TOMLFile(load_order_path).read()
-    names = TOMLFile(names_path).read()
+    hash_id = _only_installed_hash_id(layout.mods_path)
+    load_order = TOMLFile(layout.load_order_configuration_path).read()
+    names = TOMLFile(layout.names_config_path).read()
 
     assert "Pretty Combo Mod" in load_order["loose-files"]["load-order"]
     assert "Pretty Combo Mod" in load_order["esps"]["load-order"]
@@ -465,8 +456,8 @@ def test_install_writes_name_to_both_tables_when_mod_has_both(tmp_path, monkeypa
 
 
 def test_install_skips_naming_when_input_left_blank(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+    layout = _build_test_layout(tmp_path)
+    _write_config_files(layout)
 
     def build(mod_dir):
         (mod_dir / "Textures").mkdir(parents=True)
@@ -476,18 +467,18 @@ def test_install_skips_naming_when_input_left_blank(tmp_path, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: "   ")  # blank after strip
 
     args = SimpleNamespace(filepaths=[tmp_path / "mod_f.7z"])
-    cli.install(args)
+    cli.install(args, layout)
 
-    load_order = TOMLFile(load_order_path).read()
-    names = TOMLFile(names_path).read()
+    load_order = TOMLFile(layout.load_order_configuration_path).read()
+    names = TOMLFile(layout.names_config_path).read()
 
     assert load_order["loose-files"]["load-order"] == []
     assert "loose-files" not in names or len(names["loose-files"]) == 0
 
 
 def test_install_prompts_once_per_mod_in_multi_install(tmp_path, monkeypatch):
-    _patch_store_paths(monkeypatch, tmp_path)
-    load_order_path, names_path = _patch_config_paths(monkeypatch, tmp_path)
+    layout = _build_test_layout(tmp_path)
+    _write_config_files(layout)
 
     def build_g(mod_dir):
         (mod_dir / "Textures").mkdir(parents=True)
@@ -512,15 +503,15 @@ def test_install_prompts_once_per_mod_in_multi_install(tmp_path, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: next(prompts))
 
     args = SimpleNamespace(filepaths=[tmp_path / "mod_g.7z", tmp_path / "mod_h.7z"])
-    cli.install(args)
+    cli.install(args, layout)
 
-    load_order = TOMLFile(load_order_path).read()
-    names = TOMLFile(names_path).read()
+    load_order = TOMLFile(layout.load_order_configuration_path).read()
+    names = TOMLFile(layout.names_config_path).read()
 
     assert load_order["loose-files"]["load-order"] == ["Pretty Armor", "Pretty Weapon"]
 
     armor_hash_id = names["loose-files"]["Pretty Armor"]
     weapon_hash_id = names["loose-files"]["Pretty Weapon"]
     assert armor_hash_id != weapon_hash_id
-    assert (fs.MODS_PATH / armor_hash_id / "Textures" / "armor.dds").exists()
-    assert (fs.MODS_PATH / weapon_hash_id / "Textures" / "weapon.dds").exists()
+    assert (layout.mods_path / armor_hash_id / "Textures" / "armor.dds").exists()
+    assert (layout.mods_path / weapon_hash_id / "Textures" / "weapon.dds").exists()

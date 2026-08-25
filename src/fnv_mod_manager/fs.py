@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -11,28 +12,71 @@ def data_dir() -> Path:
 
 
 USER_NAME = "myuser"
-
 PACKAGE_NAME = "fnv-mod-manager"
-PROGRAM_ROOT = data_dir() / PACKAGE_NAME
-NAMES_CONFIG_PATH = PROGRAM_ROOT / "names.toml"
-LOAD_ORDER_CONFIGURATION_PATH = PROGRAM_ROOT / "configuration.toml"
-STORE_PATH = PROGRAM_ROOT / "store"
-INI_PATH = STORE_PATH / "ini"
-FALLOUT_CUSTOM_INI_PATH = INI_PATH / "FalloutCustom.ini"
-MODS_PATH = STORE_PATH / "mods"
-ESPS_PATH = STORE_PATH / "esps"
-LOOSE_FILES_PATH = STORE_PATH / "loose-files"
-GAME_FILES_PATH = STORE_PATH / "game-files"
-ROOT_FILES_PATH = STORE_PATH / "root"
-TEMPORARY_FILES_PATH = STORE_PATH / "tmp"
-PREFIX_PATH = PROGRAM_ROOT / "prefix"
-SYMLINKED_INI_PATH = PREFIX_PATH / USER_NAME / "Documents" / "My Games" / "FalloutNV"
-SYMLINKED_FALLOUT_CUSTOM_INI_PATH = SYMLINKED_INI_PATH / "FalloutCustom.ini"
-HASH_MANIFEST_PATH = TEMPORARY_FILES_PATH / "hash-manifest"
-NVSE_PATH = ROOT_FILES_PATH / "NVSE"
-FALLOUT_NEW_VEGAS_PATH = GAME_FILES_PATH / "Fallout New Vegas"
-SYMLINKED_GAME_PATH = PROGRAM_ROOT / "Fallout New Vegas"
-SYMLINKED_DATA_PATH = SYMLINKED_GAME_PATH / "Data"
+
+
+@dataclass(frozen=True)
+class Layout:
+    program_root: Path
+    names_config_path: Path
+    load_order_configuration_path: Path
+    store_path: Path
+    ini_path: Path
+    fallout_custom_ini_path: Path
+    mods_path: Path
+    esps_path: Path
+    loose_files_path: Path
+    game_files_path: Path
+    root_files_path: Path
+    temporary_files_path: Path
+    prefix_path: Path
+    symlinked_ini_path: Path
+    symlinked_fallout_custom_ini_path: Path
+    hash_manifest_path: Path
+    nvse_path: Path
+    fallout_new_vegas_path: Path
+    symlinked_game_path: Path
+    symlinked_data_path: Path
+
+
+def build_layout(root: Path, user_name: str = USER_NAME) -> Layout:
+    store_path = root / "store"
+    ini_path = store_path / "ini"
+    game_files_path = store_path / "game-files"
+    root_files_path = store_path / "root"
+    temporary_files_path = store_path / "tmp"
+    prefix_path = root / "prefix"
+    symlinked_ini_path = (
+        prefix_path / user_name / "Documents" / "My Games" / "FalloutNV"
+    )
+    symlinked_game_path = root / "Fallout New Vegas"
+
+    return Layout(
+        program_root=root,
+        names_config_path=root / "names.toml",
+        load_order_configuration_path=root / "configuration.toml",
+        store_path=store_path,
+        ini_path=ini_path,
+        fallout_custom_ini_path=ini_path / "FalloutCustom.ini",
+        mods_path=store_path / "mods",
+        esps_path=store_path / "esps",
+        loose_files_path=store_path / "loose-files",
+        game_files_path=game_files_path,
+        root_files_path=root_files_path,
+        temporary_files_path=temporary_files_path,
+        prefix_path=prefix_path,
+        symlinked_ini_path=symlinked_ini_path,
+        symlinked_fallout_custom_ini_path=symlinked_ini_path / "FalloutCustom.ini",
+        hash_manifest_path=temporary_files_path / "hash-manifest",
+        nvse_path=root_files_path / "NVSE",
+        fallout_new_vegas_path=game_files_path / "Fallout New Vegas",
+        symlinked_game_path=symlinked_game_path,
+        symlinked_data_path=symlinked_game_path / "Data",
+    )
+
+
+def default_layout() -> Layout:
+    return build_layout(data_dir() / PACKAGE_NAME)
 
 
 def extract_archive(archive_path, dest_dir):
@@ -44,9 +88,7 @@ def extract_archive(archive_path, dest_dir):
     return destination
 
 
-def remove_files_in_temp(temporary_files_path=None):
-    if temporary_files_path is None:
-        temporary_files_path = TEMPORARY_FILES_PATH
+def remove_files_in_temp(temporary_files_path: Path):
     for directory_item in temporary_files_path.iterdir():
         if directory_item.is_dir():
             shutil.rmtree(directory_item)
@@ -55,9 +97,7 @@ def remove_files_in_temp(temporary_files_path=None):
 
 
 @contextmanager
-def use_temp_dir(temporary_files_path=None):
-    if temporary_files_path is None:
-        temporary_files_path = TEMPORARY_FILES_PATH
+def use_temp_dir(temporary_files_path: Path):
     remove_files_in_temp(temporary_files_path)
     try:
         yield temporary_files_path
@@ -66,9 +106,7 @@ def use_temp_dir(temporary_files_path=None):
 
 
 @contextmanager
-def use_temp_hash_manifest(hash_manifest_path=None):
-    if hash_manifest_path is None:
-        hash_manifest_path = HASH_MANIFEST_PATH
+def use_temp_hash_manifest(hash_manifest_path: Path):
     hash_manifest_path.unlink(missing_ok=True)
     try:
         yield hash_manifest_path

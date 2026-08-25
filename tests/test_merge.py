@@ -162,24 +162,18 @@ def test_reroot_directory_tree_into_symlink_tree_doesnt_overwrite_existing_targe
 
 
 def test_merge_mods_last_wins_does_not_write_into_earlier_mods_store_directory(
-    tmp_path, monkeypatch
+    tmp_path,
 ):
-    mod_a = tmp_path / "store" / "mods" / "mod_a"
-    mod_b = tmp_path / "store" / "mods" / "mod_b"
+    layout = fs.build_layout(tmp_path)
+    mod_a = layout.mods_path / "mod_a"
+    mod_b = layout.mods_path / "mod_b"
     (mod_a / "Textures").mkdir(parents=True)
     (mod_b / "Textures").mkdir(parents=True)
     (mod_b / "Textures" / "armor.dds").write_text("mod b version")
-
-    game_files = tmp_path / "game-files" / "Fallout New Vegas"
-    game_files.mkdir(parents=True)
-
-    # TODO: add patch for NVSE
-    monkeypatch.setattr(fs, "SYMLINKED_DATA_PATH", tmp_path / "tree" / "Data")
-    monkeypatch.setattr(fs, "FALLOUT_NEW_VEGAS_PATH", game_files)
-    monkeypatch.setattr(fs, "SYMLINKED_GAME_PATH", tmp_path / "tree" / "game")
-
-    merge_mods_last_wins([mod_a, mod_b])
-
+    layout.fallout_new_vegas_path.mkdir(parents=True)
+    layout.nvse_path.mkdir(parents=True)
+    # TODO: nvse_path isn't set up here — add if merge_mods_last_wins touches it
+    merge_mods_last_wins([mod_a, mod_b], layout)
     # mod_a's real store content must be exactly what it was before merging
     # anything else — no new symlinks should ever appear inside it.
     assert list(mod_a.rglob("*")) == [mod_a / "Textures"]

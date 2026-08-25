@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import fnv_mod_manager.fs as fs
+from fnv_mod_manager.fs import Layout
 
 
 # paths are from root to file/empty-dir
@@ -49,11 +49,13 @@ def create_symlink_make_parent_dirs_no_overwrite(
 
 
 # writes paths last wins, symlink writing is first wins, so reversing makes it last wins
-def merge_mods_last_wins(data_dirs):
+def merge_mods_last_wins(data_dirs, layout: Layout):
     reversed_data_dirs = data_dirs[::-1]
     for data_dir in reversed_data_dirs:
-        reroot_directory_tree_into_symlink_tree(data_dir, fs.SYMLINKED_DATA_PATH)
-    reroot_directory_tree_into_symlink_tree(fs.NVSE_PATH, fs.SYMLINKED_GAME_PATH)
+        reroot_directory_tree_into_symlink_tree(data_dir, layout.symlinked_data_path)
     reroot_directory_tree_into_symlink_tree(
-        fs.FALLOUT_NEW_VEGAS_PATH, fs.SYMLINKED_GAME_PATH
+        layout.nvse_path, layout.symlinked_game_path
+    )
+    reroot_directory_tree_into_symlink_tree(
+        layout.fallout_new_vegas_path, layout.symlinked_game_path
     )

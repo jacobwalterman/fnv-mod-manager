@@ -1,9 +1,10 @@
 import os
 import subprocess
 
-import fnv_mod_manager.fs as fs
+from fnv_mod_manager.fs import default_layout
 
-WINE_PREFIX = fs.PREFIX_PATH
+layout = default_layout()
+WINE_PREFIX = layout.prefix_path
 PROTONPATH = "GE-Proton"
 GAMEID = "0"
 
@@ -12,7 +13,7 @@ REGISTRY_NAME = (
 )
 STRING_KEY_NAME = "Installed Path"
 
-path_to_game = fs.SYMLINKED_GAME_PATH
+path_to_game = layout.symlinked_game_path
 
 # TODO: this currently assumes the gamefiles are outside of the prefix
 stripped_root_and_separators = [piece for piece in path_to_game.parts[1::]]
@@ -61,5 +62,5 @@ if __name__ == "__main__":
     create_prefix()
     write_registry_key()
     # insert FalloutCustom.ini into prefix
-    fs.SYMLINKED_FALLOUT_CUSTOM_INI_PATH.symlink_to(fs.FALLOUT_CUSTOM_INI_PATH)
+    layout.symlinked_fallout_custom_ini_path.symlink_to(layout.fallout_custom_ini_path)
     # launch_game()
