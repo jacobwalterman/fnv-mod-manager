@@ -60,4 +60,6 @@ def launch_game():
 if __name__ == "__main__":
     create_prefix()
     write_registry_key()
-    launch_game()
+    # insert FalloutCustom.ini into prefix
+    fs.SYMLINKED_FALLOUT_CUSTOM_INI_PATH.symlink_to(fs.FALLOUT_CUSTOM_INI_PATH)
+    # launch_game()

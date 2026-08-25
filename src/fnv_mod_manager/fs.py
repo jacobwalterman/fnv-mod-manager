@@ -10,18 +10,24 @@ def data_dir() -> Path:
     return Path(base) if base else Path.home() / ".local" / "share"
 
 
+USER_NAME = "myuser"
+
 PACKAGE_NAME = "fnv-mod-manager"
 PROGRAM_ROOT = data_dir() / PACKAGE_NAME
 NAMES_CONFIG_PATH = PROGRAM_ROOT / "names.toml"
 LOAD_ORDER_CONFIGURATION_PATH = PROGRAM_ROOT / "configuration.toml"
 STORE_PATH = PROGRAM_ROOT / "store"
+INI_PATH = STORE_PATH / "ini"
+FALLOUT_CUSTOM_INI_PATH = INI_PATH / "FalloutCustom.ini"
 MODS_PATH = STORE_PATH / "mods"
 ESPS_PATH = STORE_PATH / "esps"
 LOOSE_FILES_PATH = STORE_PATH / "loose-files"
 GAME_FILES_PATH = STORE_PATH / "game-files"
 ROOT_FILES_PATH = STORE_PATH / "root"
 TEMPORARY_FILES_PATH = STORE_PATH / "tmp"
-PREFIX_PATH = STORE_PATH / "umu-prefix"
+PREFIX_PATH = PROGRAM_ROOT / "prefix"
+SYMLINKED_INI_PATH = PREFIX_PATH / USER_NAME / "Documents" / "My Games" / "FalloutNV"
+SYMLINKED_FALLOUT_CUSTOM_INI_PATH = SYMLINKED_INI_PATH / "FalloutCustom.ini"
 HASH_MANIFEST_PATH = TEMPORARY_FILES_PATH / "hash-manifest"
 NVSE_PATH = ROOT_FILES_PATH / "NVSE"
 FALLOUT_NEW_VEGAS_PATH = GAME_FILES_PATH / "Fallout New Vegas"
