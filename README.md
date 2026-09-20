@@ -1,4 +1,5 @@
 # fnvmm — Fallout: New Vegas Mod Manager
+![CI](https://github.com/jacobwalterman/fnv-mod-manager/actions/workflows/ci.yml/badge.svg)
 
 A Nix-inspired mod manager for Fallout: New Vegas. Mods are ingested into a content-addressable store and composed into a live game install as a symlink tree, so conflicts are resolved declaratively instead of by copying files around by hand.
 
