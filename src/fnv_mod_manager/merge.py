@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fnv_mod_manager.fs import Layout
@@ -8,13 +9,11 @@ def collect_file_and_empty_dir_paths(root_dir: Path):
     paths = []
     for item in root_dir.iterdir():
         if item.is_dir():
-            for dirpath, dirnames, filenames in root_dir.walk(
-                top_down=True, on_error=None, follow_symlinks=False
-            ):
+            for dirpath, dirnames, filenames in os.walk(root_dir):
                 if not filenames and not dirnames:
-                    paths.append(dirpath)
+                    paths.append(Path(dirpath))
                 for name in filenames:
-                    paths.append(Path.joinpath(dirpath, name))
+                    paths.append(Path.joinpath(Path(dirpath), name))
         else:
             paths.append(Path.joinpath(root_dir, item))
     return paths

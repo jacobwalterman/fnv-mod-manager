@@ -1,4 +1,5 @@
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -55,9 +56,11 @@ def make_hash_manifest_of_directory_contents(
     directory_to_hash_path, hash_manifest_path
 ):
     file_paths_and_hashes = list()
-    for directory_path, subdirectory_names, file_names in directory_to_hash_path.walk():
+    for directory_path, subdirectory_names, file_names in os.walk(
+        directory_to_hash_path
+    ):
         for file_name in file_names:
-            file_path = directory_path / file_name
+            file_path = directory_path / Path(file_name)
             file_hash = get_hex_hash(file_path)
             file_paths_and_hashes.append(
                 (file_path.relative_to(directory_path).as_posix(), file_hash)
@@ -126,11 +129,11 @@ def install(args, layout=fs.default_layout()):
 # returns a list of Path objects sorting all files and empty dirs as loose_files
 def walk_and_collect_loose_files(mod_dir):
     loose_files = []
-    for dir_path, dir_names, file_names in mod_dir.walk():
-        if not dir_names and not file_names and dir_path != mod_dir:
-            loose_files.append(dir_path)
+    for dir_path, dir_names, file_names in os.walk(mod_dir):
+        if not dir_names and not file_names and Path(dir_path) != mod_dir:
+            loose_files.append(Path(dir_path))
         for file_name in file_names:
-            file_path = dir_path / file_name
+            file_path = dir_path / Path(file_name)
             if (
                 file_path.suffix.lower() != ".esp"
                 and file_path.suffix.lower() != ".esm"
@@ -142,9 +145,9 @@ def walk_and_collect_loose_files(mod_dir):
 # returns a list of Path objects sorting all files and empty dirs as esps
 def walk_and_collect_esps(mod_dir):
     esps = []
-    for dir_path, dir_names, file_names in mod_dir.walk():
+    for dir_path, dir_names, file_names in os.walk(mod_dir):
         for file_name in file_names:
-            file_path = dir_path / file_name
+            file_path = dir_path / Path(file_name)
             if file_path.suffix.lower() == ".esp" or file_path.suffix.lower() == ".esm":
                 esps.append(file_path)
     return esps
