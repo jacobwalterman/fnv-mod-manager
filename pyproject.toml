@@ -5,6 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "fnv-mod-manager"
 version = "0.1.0"
+dependencies = [
+    "tomlkit",
+]
 
 [project.scripts]
 fnvmm = "fnv_mod_manager.cli:main"
