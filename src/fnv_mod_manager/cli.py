@@ -41,7 +41,7 @@ def reroot_files(file_paths, source_folder, destination_folder):
         create_symlink_make_parent_dirs_no_overwrite(file_path, symlink_destination)
 
 
-def append_pretty_name_to_files(pretty_name, mod_name, table_name, layout):
+def append_pretty_name_to_files(pretty_name, mod_name, table_name, layout: Layout):
     f = TOMLFile(layout.load_order_configuration_path)
     load_order_toml = f.read()
     load_order_toml[table_name]["load-order"].append(f"{pretty_name}")
@@ -154,8 +154,8 @@ def walk_and_collect_esps(mod_dir):
 
 
 # TODO: add flags to specify destinations, esps-only, dry run, loose_files only
-def symlink_load_order(args, layout=fs.default_layout()):
-
+def symlink_load_order(args, layout: Layout | None = None):
+    layout = layout or fs.default_layout()
     loose_files, esps = get_load_orders(layout)
     # clearing old tree for new tree
     if layout.symlinked_game_path.is_dir():
@@ -165,7 +165,15 @@ def symlink_load_order(args, layout=fs.default_layout()):
     for esp in esps:
         print(f"esp to be made: {esp} and place to go: {layout.symlinked_data_path}")
         reroot_directory_tree_into_symlink_tree(esp, layout.symlinked_data_path)
-        # create_symlink_make_parent_dirs_no_overwrite(esp, fs.SYMLINKED_DATA_PATH)
+    symlink_invalidation_bsa(layout)
+
+
+def symlink_invalidation_bsa(layout: Layout):
+    link = layout.symlinked_invalidation_bsa_path
+    if link.is_symlink() or link.exists():
+        print(f"warning: replacing {link.name} from a mod with the dummy BSA")
+        link.unlink()
+    link.symlink_to(layout.invalidation_bsa_path)
 
 
 def build_parser():

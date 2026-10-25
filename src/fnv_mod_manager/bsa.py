@@ -1,5 +1,6 @@
 import os
 import struct
+from pathlib import Path
 
 
 def flags_to_int(flag_bits: dict[str, int], flags: set[str]) -> int:
@@ -136,10 +137,5 @@ def build_dummy_bsa(file_name: str = "dummy.dds") -> bytes:
     )
 
 
-def write_dummy_bsa(path: str, file_name: str = "dummy.dds") -> None:
-    with open(path, "wb") as f:
-        f.write(build_dummy_bsa(file_name))
-
-
-if __name__ == "__main__":
-    write_dummy_bsa("dummy_output.bsa")
+def write_dummy_bsa(path: Path, file_name: str = "dummy.dds") -> None:
+    path.write_bytes(build_dummy_bsa(file_name))

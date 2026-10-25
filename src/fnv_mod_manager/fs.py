@@ -5,6 +5,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from fnv_mod_manager.bsa import write_dummy_bsa
+
 
 def data_dir() -> Path:
     base = os.environ.get("XDG_DATA_HOME")
@@ -13,6 +15,7 @@ def data_dir() -> Path:
 
 USER_NAME = "myuser"
 PACKAGE_NAME = "fnv-mod-manager"
+INVALIDATION_BSA_NAME = "Fallout - Invalidation.bsa"
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,8 @@ class Layout:
     fallout_new_vegas_path: Path
     symlinked_game_path: Path
     symlinked_data_path: Path
+    invalidation_bsa_path: Path
+    symlinked_invalidation_bsa_path: Path
 
 
 def build_layout(root: Path, user_name: str = USER_NAME) -> Layout:
@@ -46,10 +51,13 @@ def build_layout(root: Path, user_name: str = USER_NAME) -> Layout:
     root_files_path = store_path / "root"
     temporary_files_path = store_path / "tmp"
     prefix_path = root / "prefix"
+    bsa_path = store_path / "bsa"
     symlinked_ini_path = (
         prefix_path / user_name / "Documents" / "My Games" / "FalloutNV"
     )
     symlinked_game_path = root / "Fallout New Vegas"
+    symlinked_data_path = symlinked_game_path / "Data"
+
     directories = (
         symlinked_game_path,
         prefix_path,
@@ -58,9 +66,14 @@ def build_layout(root: Path, user_name: str = USER_NAME) -> Layout:
         store_path,
         ini_path,
         game_files_path,
+        bsa_path,
     )
     for directory in directories:
         directory.mkdir(parents=True, exist_ok=True)
+    invalidation_bsa_path = bsa_path / INVALIDATION_BSA_NAME
+    if not invalidation_bsa_path.exists():
+        write_dummy_bsa(invalidation_bsa_path)
+
     return Layout(
         program_root=root,
         names_config_path=root / "names.toml",
@@ -81,7 +94,9 @@ def build_layout(root: Path, user_name: str = USER_NAME) -> Layout:
         nvse_path=root_files_path / "NVSE",
         fallout_new_vegas_path=game_files_path / "Fallout New Vegas",
         symlinked_game_path=symlinked_game_path,
-        symlinked_data_path=symlinked_game_path / "Data",
+        symlinked_data_path=symlinked_data_path,
+        invalidation_bsa_path=invalidation_bsa_path,
+        symlinked_invalidation_bsa_path=symlinked_data_path / INVALIDATION_BSA_NAME,
     )
 
 
